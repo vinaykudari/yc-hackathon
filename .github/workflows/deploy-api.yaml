@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'apps/backend/**'          # only runs when these files change
+      - 'backend/**'
       - '.github/workflows/deploy-api.yml'
 
 jobs:
@@ -19,7 +19,7 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - uses: docker/build-push-action@v5
         with:
-          context: apps/web-api
+          context: backend
           push: true
           tags: vinaykudari/yc-api:latest
       - name: Install Koyeb CLI
