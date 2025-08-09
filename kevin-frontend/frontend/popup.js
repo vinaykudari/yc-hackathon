@@ -150,6 +150,38 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
 
+  async function handlePenTool() {
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      await chrome.tabs.sendMessage(tab.id, { action: 'show-editor-overlay' });
+      await chrome.tabs.sendMessage(tab.id, { action: 'enter-pen-mode' });
+      updateStatus('Pen tool activated - draw on the page', 'success');
+    } catch (e) {
+      updateStatus(`Pen tool failed: ${e.message}`, 'error');
+    }
+  }
+
+  async function handleBoxTool() {
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      await chrome.tabs.sendMessage(tab.id, { action: 'show-editor-overlay' });
+      await chrome.tabs.sendMessage(tab.id, { action: 'enter-box-mode' });
+      updateStatus('Box tool activated - create boxes on the page', 'success');
+    } catch (e) {
+      updateStatus(`Box tool failed: ${e.message}`, 'error');
+    }
+  }
+
+  async function handleExportPDF() {
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      await chrome.tabs.sendMessage(tab.id, { action: 'export-pdf' });
+      updateStatus('PDF export initiated', 'success');
+    } catch (e) {
+      updateStatus(`Export failed: ${e.message}`, 'error');
+    }
+  }
+
   async function handleApplyText() {
     const text = (modifierInput?.value || '').trim();
     if (!text) { updateStatus('Enter text to apply', 'error'); return; }
