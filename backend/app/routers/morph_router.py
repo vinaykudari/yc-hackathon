@@ -16,13 +16,10 @@ class MorphRequest(BaseModel):
 @router.post("/morph")
 async def morph(req: MorphRequest):
     try:
-        def run():
-            return client.chat.completions.create(
-                model=req.model or "morph-v3-fast",
-                messages=[{"role": "user", "content": req.prompt}],
-            )
-
-        resp = await anyio.to_thread.run_sync(run)
+        resp =  client.chat.completions.create(
+            model=req.model or "morph-v3-fast",
+            messages=[{"role": "user", "content": req.prompt}],
+        )
         return {"content": resp.choices[0].message.content}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
