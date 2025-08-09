@@ -134,6 +134,48 @@
           sendResponse({ success: false, error: e.message });
         }
         break;
+
+      case 'enter-pen-mode':
+        try {
+          enterPenMode();
+          sendResponse({ success: true });
+        } catch (e) {
+          sendResponse({ success: false, error: e.message });
+        }
+        break;
+
+      case 'enter-box-mode':
+        try {
+          enterBoxMode();
+          sendResponse({ success: true });
+        } catch (e) {
+          sendResponse({ success: false, error: e.message });
+        }
+        break;
+
+      case 'exit-all-modes':
+        try {
+          exitAllModes();
+          sendResponse({ success: true });
+        } catch (e) {
+          sendResponse({ success: false, error: e.message });
+        }
+        break;
+
+      case 'clear-annotations':
+        try {
+          clearAnnotations();
+          sendResponse({ success: true });
+        } catch (e) {
+          sendResponse({ success: false, error: e.message });
+        }
+        break;
+
+      case 'export-pdf':
+        exportPageAsPDF()
+          .then(() => sendResponse({ success: true }))
+          .catch(e => sendResponse({ success: false, error: e.message }));
+        return true;
     }
   });
 
@@ -346,8 +388,325 @@
     };
   }
 
+  // ===== Drawing and annotation tools =====
+  
+  function createDrawingCanvas() {
+    if (drawingCanvas) return drawingCanvas;
+    
+    drawingCanvas = document.createElement('canvas');
+    drawingCanvas.id = 'morph-drawing-canvas';
+    drawingCanvas.width = window.innerWidth;
+    drawingCanvas.height = window.innerHeight;
+    
+    Object.assign(drawingCanvas.style, {
+      position: 'fixed',
+      top: '0',
+      left: '0',
+      width: '100vw',
+      height: '100vh',
+      pointerEvents: 'none',
+      zIndex: '2147483645',
+      background: 'transparent'
+    });
+    
+    document.body.appendChild(drawingCanvas);
+    
+    // Handle window resize
+    const resizeCanvas = () => {
+      drawingCanvas.width = window.innerWidth;
+      drawingCanvas.height = window.innerHeight;
+      redrawAnnotations();
+    };
+    window.addEventListener('resize', resizeCanvas);
+    
+    return drawingCanvas;
+  }
+  
+  function enterPenMode() {
+    exitAllModes();
+    penModeActive = true;
+    createDrawingCanvas();
+    drawingCanvas.style.pointerEvents = 'auto';
+    drawingCanvas.style.cursor = 'crosshair';
+    
+    drawingCanvas.addEventListener('mousedown', onPenMouseDown);
+    drawingCanvas.addEventListener('mousemove', onPenMouseMove);
+    drawingCanvas.addEventListener('mouseup', onPenMouseUp);
+    drawingCanvas.addEventListener('mouseleave', onPenMouseUp);
+  }
+  
+  function enterBoxMode() {
+    exitAllModes();
+    boxModeActive = true;
+    createDrawingCanvas();
+    drawingCanvas.style.pointerEvents = 'auto';
+    drawingCanvas.style.cursor = 'crosshair';
+    
+    drawingCanvas.addEventListener('mousedown', onBoxMouseDown);
+    drawingCanvas.addEventListener('mousemove', onBoxMouseMove);
+    drawingCanvas.addEventListener('mouseup', onBoxMouseUp);
+    drawingCanvas.addEventListener('mouseleave', onBoxMouseUp);
+  }
+  
+  function exitAllModes() {
+    // Exit select mode
+    if (selectModeActive) {
+      selectModeActive = false;
+      if (hoverOverlay) hoverOverlay.style.display = 'none';
+      document.removeEventListener('mousemove', onMouseMoveHighlight, true);
+      document.removeEventListener('click', onClickSelect, true);
+    }
+    
+    // Exit drawing modes
+    penModeActive = false;
+    boxModeActive = false;
+    isDrawing = false;
+    currentPath = null;
+    currentBox = null;
+    
+    if (drawingCanvas) {
+      drawingCanvas.style.pointerEvents = 'none';
+      drawingCanvas.style.cursor = 'default';
+      drawingCanvas.removeEventListener('mousedown', onPenMouseDown);
+      drawingCanvas.removeEventListener('mousemove', onPenMouseMove);
+      drawingCanvas.removeEventListener('mouseup', onPenMouseUp);
+      drawingCanvas.removeEventListener('mouseleave', onPenMouseUp);
+      drawingCanvas.removeEventListener('mousedown', onBoxMouseDown);
+      drawingCanvas.removeEventListener('mousemove', onBoxMouseMove);
+      drawingCanvas.removeEventListener('mouseup', onBoxMouseUp);
+      drawingCanvas.removeEventListener('mouseleave', onBoxMouseUp);
+    }
+  }
+  
+  function onPenMouseDown(e) {
+    if (!penModeActive) return;
+    isDrawing = true;
+    const rect = drawingCanvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    currentPath = {
+      type: 'pen',
+      points: [{ x, y }],
+      color: penColor,
+      width: penWidth,
+      timestamp: Date.now()
+    };
+  }
+  
+  function onPenMouseMove(e) {
+    if (!penModeActive || !isDrawing || !currentPath) return;
+    
+    const rect = drawingCanvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    currentPath.points.push({ x, y });
+    redrawAnnotations();
+  }
+  
+  function onPenMouseUp(e) {
+    if (!penModeActive || !isDrawing) return;
+    
+    isDrawing = false;
+    if (currentPath && currentPath.points.length > 1) {
+      annotations.push(currentPath);
+    }
+    currentPath = null;
+  }
+  
+  function onBoxMouseDown(e) {
+    if (!boxModeActive) return;
+    isDrawing = true;
+    const rect = drawingCanvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    currentBox = {
+      type: 'box',
+      startX: x,
+      startY: y,
+      endX: x,
+      endY: y,
+      color: boxColor,
+      borderWidth: boxBorderWidth,
+      timestamp: Date.now()
+    };
+  }
+  
+  function onBoxMouseMove(e) {
+    if (!boxModeActive || !isDrawing || !currentBox) return;
+    
+    const rect = drawingCanvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    currentBox.endX = x;
+    currentBox.endY = y;
+    redrawAnnotations();
+  }
+  
+  function onBoxMouseUp(e) {
+    if (!boxModeActive || !isDrawing) return;
+    
+    isDrawing = false;
+    if (currentBox) {
+      // Only save boxes that have meaningful size
+      const width = Math.abs(currentBox.endX - currentBox.startX);
+      const height = Math.abs(currentBox.endY - currentBox.startY);
+      if (width > 5 && height > 5) {
+        annotations.push(currentBox);
+      }
+    }
+    currentBox = null;
+  }
+  
+  function redrawAnnotations() {
+    if (!drawingCanvas) return;
+    
+    const ctx = drawingCanvas.getContext('2d');
+    ctx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+    
+    // Draw saved annotations
+    annotations.forEach(annotation => {
+      if (annotation.type === 'pen') {
+        drawPenPath(ctx, annotation);
+      } else if (annotation.type === 'box') {
+        drawBox(ctx, annotation);
+      }
+    });
+    
+    // Draw current path/box being drawn
+    if (currentPath) {
+      drawPenPath(ctx, currentPath);
+    }
+    if (currentBox) {
+      drawBox(ctx, currentBox);
+    }
+  }
+  
+  function drawPenPath(ctx, path) {
+    if (!path.points || path.points.length < 2) return;
+    
+    ctx.strokeStyle = path.color;
+    ctx.lineWidth = path.width;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    
+    ctx.beginPath();
+    ctx.moveTo(path.points[0].x, path.points[0].y);
+    
+    for (let i = 1; i < path.points.length; i++) {
+      ctx.lineTo(path.points[i].x, path.points[i].y);
+    }
+    
+    ctx.stroke();
+  }
+  
+  function drawBox(ctx, box) {
+    const x = Math.min(box.startX, box.endX);
+    const y = Math.min(box.startY, box.endY);
+    const width = Math.abs(box.endX - box.startX);
+    const height = Math.abs(box.endY - box.startY);
+    
+    ctx.strokeStyle = box.color;
+    ctx.lineWidth = box.borderWidth;
+    ctx.setLineDash([]);
+    
+    ctx.strokeRect(x, y, width, height);
+  }
+  
+  function clearAnnotations() {
+    annotations = [];
+    if (drawingCanvas) {
+      const ctx = drawingCanvas.getContext('2d');
+      ctx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+    }
+  }
+  
+  async function exportPageAsPDF() {
+    try {
+      // Use browser's print functionality to generate PDF
+      // First, temporarily hide the drawing canvas to avoid interference
+      const originalDisplay = drawingCanvas ? drawingCanvas.style.display : '';
+      if (drawingCanvas) drawingCanvas.style.display = 'none';
+      
+      // Create a clone of the page for PDF export that includes annotations
+      const pageClone = document.documentElement.cloneNode(true);
+      
+      // Convert canvas annotations to SVG overlay for PDF
+      if (annotations.length > 0) {
+        const svgOverlay = createSVGFromAnnotations();
+        if (svgOverlay) {
+          pageClone.querySelector('body').appendChild(svgOverlay);
+        }
+      }
+      
+      // Restore canvas display
+      if (drawingCanvas) drawingCanvas.style.display = originalDisplay;
+      
+      // Trigger browser print dialog
+      window.print();
+      
+      return { success: true };
+    } catch (error) {
+      if (drawingCanvas) drawingCanvas.style.display = originalDisplay;
+      throw new Error(`PDF export failed: ${error.message}`);
+    }
+  }
+  
+  function createSVGFromAnnotations() {
+    if (annotations.length === 0) return null;
+    
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('width', window.innerWidth);
+    svg.setAttribute('height', window.innerHeight);
+    svg.style.position = 'fixed';
+    svg.style.top = '0';
+    svg.style.left = '0';
+    svg.style.pointerEvents = 'none';
+    svg.style.zIndex = '1000';
+    
+    annotations.forEach(annotation => {
+      if (annotation.type === 'pen') {
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        const pathData = annotation.points
+          .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`)
+          .join(' ');
+        
+        path.setAttribute('d', pathData);
+        path.setAttribute('stroke', annotation.color);
+        path.setAttribute('stroke-width', annotation.width);
+        path.setAttribute('fill', 'none');
+        path.setAttribute('stroke-linecap', 'round');
+        path.setAttribute('stroke-linejoin', 'round');
+        
+        svg.appendChild(path);
+      } else if (annotation.type === 'box') {
+        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        const x = Math.min(annotation.startX, annotation.endX);
+        const y = Math.min(annotation.startY, annotation.endY);
+        const width = Math.abs(annotation.endX - annotation.startX);
+        const height = Math.abs(annotation.endY - annotation.startY);
+        
+        rect.setAttribute('x', x);
+        rect.setAttribute('y', y);
+        rect.setAttribute('width', width);
+        rect.setAttribute('height', height);
+        rect.setAttribute('stroke', annotation.color);
+        rect.setAttribute('stroke-width', annotation.borderWidth);
+        rect.setAttribute('fill', 'none');
+        
+        svg.appendChild(rect);
+      }
+    });
+    
+    return svg;
+  }
+
   function enterSelectMode() {
     if (selectModeActive) return;
+    exitAllModes();
     selectModeActive = true;
     ensureHoverOverlay();
     document.addEventListener('mousemove', onMouseMoveHighlight, true);
@@ -487,8 +846,8 @@
       position: 'fixed',
       top: '80px',
       right: '12px',
-      width: '360px',
-      minHeight: '180px',
+      width: '420px',
+      minHeight: '220px',
       zIndex: '2147483647',
       background: '#ffffff',
       color: '#333',
@@ -537,13 +896,17 @@
     infoRow.textContent = 'Select an element, then apply text or styles.';
     body.appendChild(infoRow);
 
-    // Buttons row 1
+    // Buttons row 1 - Tools
     const row1 = document.createElement('div');
     Object.assign(row1.style, { display: 'flex', gap: '8px', marginBottom: '8px' });
     btnLoadInfo = createActionBtn('📥 Load Info');
     btnSelectToggle = createActionBtn('🖱️ Select');
+    const btnPenTool = createActionBtn('🖊️ Pen');
+    const btnBoxTool = createActionBtn('📦 Box');
     row1.appendChild(btnLoadInfo);
     row1.appendChild(btnSelectToggle);
+    row1.appendChild(btnPenTool);
+    row1.appendChild(btnBoxTool);
     body.appendChild(row1);
 
     // Selected element info
@@ -571,12 +934,21 @@
     row2.appendChild(btnApplyStyle);
     body.appendChild(row2);
 
-    // Buttons row 3 (debug)
+    // Buttons row 3 (export and clear)
     const row3 = document.createElement('div');
     Object.assign(row3.style, { display: 'flex', gap: '8px', marginTop: '8px' });
-    btnDebug = createActionBtn('🐞 Debug');
-    row3.appendChild(btnDebug);
+    const btnExportPDF = createActionBtn('📄 Export PDF');
+    const btnClearAnnotations = createActionBtn('🗑️ Clear');
+    row3.appendChild(btnExportPDF);
+    row3.appendChild(btnClearAnnotations);
     body.appendChild(row3);
+
+    // Buttons row 4 (debug)
+    const row4 = document.createElement('div');
+    Object.assign(row4.style, { display: 'flex', gap: '8px', marginTop: '8px' });
+    btnDebug = createActionBtn('🐞 Debug');
+    row4.appendChild(btnDebug);
+    body.appendChild(row4);
 
     // Debug panel (hidden by default)
     debugPanel = document.createElement('div');
@@ -627,6 +999,47 @@
       toggleAndRenderDebug();
     });
 
+    // New tool event listeners
+    btnPenTool.addEventListener('click', () => {
+      if (penModeActive) {
+        exitAllModes();
+        btnPenTool.textContent = '🖊️ Pen';
+        infoRow.textContent = 'Pen mode disabled';
+      } else {
+        enterPenMode();
+        btnPenTool.textContent = '✅ Drawing...';
+        infoRow.textContent = 'Pen mode: Click and drag to draw';
+      }
+    });
+
+    btnBoxTool.addEventListener('click', () => {
+      if (boxModeActive) {
+        exitAllModes();
+        btnBoxTool.textContent = '📦 Box';
+        infoRow.textContent = 'Box mode disabled';
+      } else {
+        enterBoxMode();
+        btnBoxTool.textContent = '✅ Boxing...';
+        infoRow.textContent = 'Box mode: Click and drag to create boxes';
+      }
+    });
+
+    btnExportPDF.addEventListener('click', () => {
+      infoRow.textContent = 'Exporting page as PDF...';
+      exportPageAsPDF()
+        .then(() => {
+          infoRow.textContent = 'PDF export dialog opened';
+        })
+        .catch(e => {
+          infoRow.textContent = `Export failed: ${e.message}`;
+        });
+    });
+
+    btnClearAnnotations.addEventListener('click', () => {
+      clearAnnotations();
+      infoRow.textContent = 'All annotations cleared';
+    });
+
     // Dragging
     editorHeader.addEventListener('mousedown', (e) => {
       isDragging = true;
@@ -652,13 +1065,14 @@
     Object.assign(btn.style, {
       all: 'initial',
       flex: '1',
-      padding: '10px 12px',
+      padding: '8px 6px',
       background: 'linear-gradient(135deg, #667eea, #764ba2)',
       color: '#fff',
-      borderRadius: '8px',
+      borderRadius: '6px',
       textAlign: 'center',
-      fontSize: '12px',
-      cursor: 'pointer'
+      fontSize: '11px',
+      cursor: 'pointer',
+      whiteSpace: 'nowrap'
     });
     return btn;
   }
