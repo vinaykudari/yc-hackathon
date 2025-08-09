@@ -26,7 +26,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
   function setupEventListeners() {
     previewBtn.addEventListener('click', handlePreviewDOM);
-    settingsBtn.addEventListener('click', handleSettings);
     if (settingsBtn) settingsBtn.addEventListener('click', handleSettings);
     if (helpBtn) helpBtn.addEventListener('click', handleHelp);
     
