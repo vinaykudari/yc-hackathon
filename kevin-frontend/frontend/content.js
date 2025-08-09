@@ -61,6 +61,33 @@
           sendResponse({ success: false, error: e.message });
         }
         break;
+
+      case 'gather-dom-min':
+        try {
+          const pack = gatherDomMinimal();
+          sendResponse({ success: true, data: { context: pack } });
+        } catch (e) {
+          sendResponse({ success: false, error: e.message });
+        }
+        break;
+
+      case 'inject-js':
+        try {
+          loadAndApplyJsModule(request.code || '');
+          sendResponse({ success: true });
+        } catch (e) {
+          sendResponse({ success: false, error: e.message });
+        }
+        break;
+
+      case 'inject-html':
+        try {
+          injectHtmlSnippet(request.html || '');
+          sendResponse({ success: true });
+        } catch (e) {
+          sendResponse({ success: false, error: e.message });
+        }
+        break;
     }
   });
 
@@ -338,6 +365,115 @@
       document.documentElement.appendChild(styleEl);
     }
     styleEl.textContent = cssText;
+  }
+
+  // Build a compact DOM context pack
+  function gatherDomMinimal() {
+    const meta = {
+      url: location.href,
+      title: document.title,
+      viewport: { w: innerWidth, h: innerHeight },
+      frameworkHints: Boolean(document.querySelector('#__next, [data-reactroot], #app, [data-v-app]')),
+      landmarks: Array.from(document.querySelectorAll('header,nav,main,aside,footer'))
+        .slice(0, 10)
+        .map(el => ({ tag: el.tagName.toLowerCase(), id: el.id, class: el.className }))
+    };
+
+    // Candidate elements via simple heuristics
+    const candidates = Array.from(document.querySelectorAll('button,a,[role="button"],.btn,input,select,textarea,[aria-modal="true"]'))
+      .slice(0, 50)
+      .map(el => serializeCandidate(el));
+
+    return JSON.stringify({ meta, candidates }).slice(0, 12 * 1024);
+  }
+
+  function serializeCandidate(el) {
+    const info = {
+      tag: el.tagName.toLowerCase(),
+      id: el.id || undefined,
+      class: el.className || undefined,
+      role: el.getAttribute('role') || undefined,
+      text: (el.innerText || '').slice(0, 140),
+      attrs: {}
+    };
+    for (const a of el.attributes) {
+      if (/^(id|class|role|style|href|src|data-[-\w]+|aria-[-\w]+)$/i.test(a.name)) {
+        info.attrs[a.name] = a.value.slice(0, 200);
+      }
+    }
+    // capture small outerHTML excerpt
+    info.html = (el.outerHTML || '').split('\n').slice(0, 30).join('\n');
+    // build a simple selector path
+    info.selector = buildCssPath(el).slice(0, 300);
+    return info;
+  }
+
+  function buildCssPath(el) {
+    const parts = [];
+    let node = el;
+    while (node && node.nodeType === 1 && parts.length < 6) {
+      const name = node.tagName.toLowerCase();
+      if (node.id) {
+        parts.unshift(`#${node.id}`);
+        break;
+      }
+      const className = (node.className || '').trim().split(/\s+/).filter(Boolean)[0];
+      if (className) {
+        parts.unshift(`${name}.${className}`);
+      } else {
+        parts.unshift(name);
+      }
+      node = node.parentElement;
+    }
+    return parts.join(' > ');
+  }
+
+  // Load JS as an ES module via blob and call exported apply()
+  async function loadAndApplyJsModule(code) {
+    const blob = new Blob([code], { type: 'text/javascript' });
+    const url = URL.createObjectURL(blob);
+    try {
+      const mod = await import(url);
+      if (typeof mod.apply === 'function') {
+        await mod.apply();
+      }
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+
+  // Inject simple HTML snippet into main container
+  function injectHtmlSnippet(html) {
+    const container = document.querySelector('main, #main, .main, #content, .content, article, section, body') || document.body;
+    // if banner exists, update it
+    if (html.includes('morph-cta') && container.querySelector('#morph-cta')) {
+      container.querySelector('#morph-cta').outerHTML = html;
+      hookCtaClose();
+      return;
+    }
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    const node = tmp.firstElementChild;
+    if (node) {
+      // Prefer inserting after the first heading if present
+      const firstHeading = container.querySelector('h1,h2,h3');
+      if (firstHeading && firstHeading.parentNode === container) {
+        firstHeading.insertAdjacentElement('afterend', node);
+      } else {
+        container.insertBefore(node, container.firstChild);
+      }
+      hookCtaClose();
+    }
+  }
+
+  function hookCtaClose() {
+    const btn = document.getElementById('morph-cta-close');
+    if (btn) {
+      btn.addEventListener('click', () => {
+        const el = document.getElementById('morph-cta');
+        if (el) el.remove();
+      }, { once: true });
+    }
   }
 
   // Create a visual indicator when DOM is being updated

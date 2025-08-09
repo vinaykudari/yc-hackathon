@@ -13,6 +13,8 @@ document.addEventListener('DOMContentLoaded', function() {
   const morphApiKeyInput = document.getElementById('morphApiKey');
   const morphModelSelect = document.getElementById('morphModel');
   const applyCssPersonaBtn = document.getElementById('applyCssPersonaBtn');
+  const applyJsPersonaBtn = document.getElementById('applyJsPersonaBtn');
+  const applyHtmlPersonaBtn = document.getElementById('applyHtmlPersonaBtn');
 
   // Initialize popup
   init();
@@ -25,14 +27,17 @@ document.addEventListener('DOMContentLoaded', function() {
   function setupEventListeners() {
     previewBtn.addEventListener('click', handlePreviewDOM);
     settingsBtn.addEventListener('click', handleSettings);
-    helpBtn.addEventListener('click', handleHelp);
+    if (settingsBtn) settingsBtn.addEventListener('click', handleSettings);
+    if (helpBtn) helpBtn.addEventListener('click', handleHelp);
     
     // Save Morph settings on change
     morphApiKeyInput.addEventListener('input', saveMorphSettings);
     morphModelSelect.addEventListener('change', saveMorphSettings);
     personaSelect.addEventListener('change', saveMorphSettings);
 
-    applyCssPersonaBtn.addEventListener('click', handleApplyCssPersona);
+    applyCssPersonaBtn.addEventListener('click', () => handleApply('css'));
+    applyJsPersonaBtn.addEventListener('click', () => handleApply('js'));
+    applyHtmlPersonaBtn.addEventListener('click', () => handleApply('html'));
   }
 
   async function handlePreviewDOM() {
@@ -93,7 +98,7 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   function setLoading(isLoading) {
-    const buttons = [applyCssPersonaBtn, previewBtn];
+    const buttons = [applyCssPersonaBtn, applyJsPersonaBtn, applyHtmlPersonaBtn, previewBtn];
     buttons.forEach(btn => {
       btn.disabled = isLoading;
       if (isLoading) {
@@ -171,7 +176,7 @@ document.addEventListener('DOMContentLoaded', function() {
       // Empty default option
       const emptyOpt = document.createElement('option');
       emptyOpt.value = '';
-      emptyOpt.textContent = 'Select a CSS persona...';
+      emptyOpt.textContent = 'Select a persona...';
       personaSelect.appendChild(emptyOpt);
 
       for (const p of personas) {
@@ -190,13 +195,13 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
 
-  async function handleApplyCssPersona() {
+  async function handleApply(kind) {
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (!tab || !tab.id) throw new Error('No active tab');
 
       if (!personaSelect.value) {
-        updateStatus('Please choose a CSS persona first', 'error');
+        updateStatus('Please choose a persona first', 'error');
         return;
       }
       const persona = (window.__morphPersonas || []).find(p => p.id === personaSelect.value);
@@ -210,37 +215,51 @@ document.addEventListener('DOMContentLoaded', function() {
       const apiKey = morphSettings?.apiKey || '';
       const model = morphSettings?.model || 'morph-v3-fast';
       setLoading(true);
-      updateStatus('Applying CSS persona with Morph...', 'loading');
+      updateStatus(`Applying ${kind.toUpperCase()} persona with Morph...`, 'loading');
       showProgress(true);
 
-      // Build per-origin small patch file (site.css) from storage
+      // Build per-origin small patch file from storage
       const origin = new URL(tab.url).origin;
-      const siteCssKey = `site_css::${origin}`;
-      const stored = await chrome.storage.local.get([siteCssKey]);
-      let siteCss = String(stored[siteCssKey] || '').slice(0, 6 * 1024); // cap 6KB
-      if (!siteCss) {
-        siteCss = '/* morph site.css overrides (per-origin) */\n';
+      const storageKeyMap = {
+        css: `site_css::${origin}`,
+        js: `site_js::${origin}`,
+        html: `site_html::${origin}`
+      };
+      const defaults = {
+        css: '/* morph site.css overrides (per-origin) */\n',
+        js: 'export function apply() {}\n',
+        html: '<!-- morph site.html snippets (per-origin) -->\n'
+      };
+      const storageKey = storageKeyMap[kind];
+      const stored = await chrome.storage.local.get([storageKey]);
+      let originalText = String(stored[storageKey] || '').slice(0, 6 * 1024); // cap 6KB
+      if (!originalText) {
+        originalText = defaults[kind];
       }
 
-      // Ask content script for minimal context pack
-      const gatherResp = await chrome.tabs.sendMessage(tab.id, { action: 'gather-css-min' });
+      const gatherResp = await chrome.tabs.sendMessage(
+        tab.id,
+        { action: kind === 'css' ? 'gather-css-min' : 'gather-dom-min' }
+      );
       if (!gatherResp || !gatherResp.success) {
         throw new Error(gatherResp?.error || 'Failed to gather CSS context');
       }
-      const contextPack = String(gatherResp.data?.css || '').slice(0, 12 * 1024); // cap 12KB
+      const contextPackRaw = kind === 'css' ? (gatherResp.data?.css || '') : (gatherResp.data?.context || '');
+      const contextPack = String(contextPackRaw).slice(0, 12 * 1024); // cap 12KB
 
       // Build Morph Apply request using small patch file + update snippet; include context as guidance
-      const userInstruction = persona.apply.instruction || 'I will apply CSS updates.';
-      const updateSnippet = (persona.apply.update || '/* no-op */').slice(0, 2 * 1024); // cap 2KB
+      const personaBlock = persona[kind] || {};
+      const userInstruction = personaBlock.instruction || `I will apply ${kind.toUpperCase()} updates.`;
+      const updateSnippet = (personaBlock.update || '').slice(0, 2 * 1024); // cap 2KB
       const instruction = `${userInstruction}\n\n<context>\n${contextPack}\n</context>`;
-      const originalCss = siteCss;
+      const originalCode = originalText;
 
       const morphPayload = {
         apiKey,
         model,
-        kind: 'css',
+        kind,
         instruction,
-        original: originalCss,
+        original: originalCode,
         update: updateSnippet
       };
 
@@ -250,24 +269,27 @@ document.addEventListener('DOMContentLoaded', function() {
         throw new Error(morphResp?.error || 'Morph Apply failed');
       }
 
-      const finalCss = (morphResp.data?.final_code || morphResp.data?.content || morphResp.data?.final || morphResp.data || '').slice(0, 16 * 1024);
-      if (!finalCss) {
-        throw new Error('No CSS returned from Morph');
+      const finalText = (morphResp.data?.final_code || morphResp.data?.content || morphResp.data?.final || morphResp.data || '');
+      if (kind === 'css') {
+        await chrome.storage.local.set({ [storageKey]: finalText });
+        const injectResp = await chrome.tabs.sendMessage(tab.id, { action: 'inject-css', css: finalText });
+        if (!injectResp || !injectResp.success) throw new Error(injectResp?.error || 'Failed to inject CSS');
+      } else if (kind === 'js') {
+        await chrome.storage.local.set({ [storageKey]: finalText });
+        const injectResp = await chrome.tabs.sendMessage(tab.id, { action: 'inject-js', code: finalText });
+        if (!injectResp || !injectResp.success) throw new Error(injectResp?.error || 'Failed to inject JS');
+      } else if (kind === 'html') {
+        await chrome.storage.local.set({ [storageKey]: finalText });
+        const injectResp = await chrome.tabs.sendMessage(tab.id, { action: 'inject-html', html: finalText });
+        if (!injectResp || !injectResp.success) throw new Error(injectResp?.error || 'Failed to inject HTML');
       }
 
-      // Persist and inject new CSS
-      await chrome.storage.local.set({ [siteCssKey]: finalCss });
-      const injectResp = await chrome.tabs.sendMessage(tab.id, { action: 'inject-css', css: finalCss });
-      if (!injectResp || !injectResp.success) {
-        throw new Error(injectResp?.error || 'Failed to inject CSS');
-      }
-
-      updateStatus('CSS persona applied!', 'success');
-      displayResults('Morph Apply (CSS)', {
+      updateStatus(`${kind.toUpperCase()} persona applied!`, 'success');
+      displayResults(`Morph Apply (${kind.toUpperCase()})`, {
         persona: persona.name,
         model,
-        inputBytes: siteCss.length,
-        outputBytes: finalCss.length,
+        inputBytes: originalText.length,
+        outputBytes: finalText.length,
         timestamp: new Date().toLocaleString()
       });
     } catch (err) {
