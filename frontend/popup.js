@@ -49,6 +49,11 @@ document.addEventListener('DOMContentLoaded', function() {
       // Get current tab
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       
+      // Check if tab URL is valid for content script injection
+      if (tab.url.startsWith('chrome://') || tab.url.startsWith('chrome-extension://') || tab.url.startsWith('moz-extension://')) {
+        throw new Error('Cannot modify Chrome internal pages. Please try on a regular website.');
+      }
+      
       // Send message to content script to update DOM
       const response = await chrome.tabs.sendMessage(tab.id, {
         action: 'update-dom-via-api',
@@ -71,12 +76,23 @@ document.addEventListener('DOMContentLoaded', function() {
       
     } catch (error) {
       console.error('DOM update failed:', error);
-      updateStatus(`Update failed: ${error.message}`, 'error');
+      
+      // Provide specific error messages for common issues
+      let errorMessage = error.message;
+      if (error.message.includes('Could not establish connection')) {
+        errorMessage = 'Content script not loaded. Try refreshing the page and ensure you\'re on a regular website (not chrome:// pages).';
+      } else if (error.message.includes('Receiving end does not exist')) {
+        errorMessage = 'Extension content script not responding. Please refresh the page and try again.';
+      }
+      
+      updateStatus(`Update failed: ${errorMessage}`, 'error');
       displayResults('Error Details', {
-        error: error.message,
+        error: errorMessage,
+        originalError: error.message,
         apiUrl: apiUrl,
         method: apiMethod,
-        timestamp: new Date().toLocaleString()
+        timestamp: new Date().toLocaleString(),
+        troubleshooting: 'Try: 1) Refresh the page, 2) Ensure you\'re on a regular website, 3) Check that API URL includes /test-api endpoint'
       });
     } finally {
       setLoading(false);
@@ -91,6 +107,11 @@ document.addEventListener('DOMContentLoaded', function() {
     try {
       // Get current tab
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      
+      // Check if tab URL is valid for content script injection
+      if (tab.url.startsWith('chrome://') || tab.url.startsWith('chrome-extension://') || tab.url.startsWith('moz-extension://')) {
+        throw new Error('Cannot analyze Chrome internal pages. Please try on a regular website.');
+      }
       
       // Send message to content script to get DOM info
       const response = await chrome.tabs.sendMessage(tab.id, {
@@ -167,7 +188,7 @@ document.addEventListener('DOMContentLoaded', function() {
     try {
       const result = await chrome.storage.sync.get(['apiSettings']);
       const settings = result.apiSettings || {
-        apiUrl: '/test-api',
+        apiUrl: 'http://localhost:8000/test-api',
         apiMethod: 'POST'
       };
 

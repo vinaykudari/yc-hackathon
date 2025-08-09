@@ -94,6 +94,9 @@
       fullUrl = 'https://' + apiUrl;
     }
 
+    // Fix 0.0.0.0 addresses which browsers can't access
+    fullUrl = fullUrl.replace('://0.0.0.0:', '://localhost:');
+
     console.log('Sending DOM to:', fullUrl);
 
     const requestOptions = {
