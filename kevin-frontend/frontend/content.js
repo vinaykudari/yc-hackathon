@@ -319,6 +319,19 @@
   let selectedElement = null;
   let hoverOverlay = null;
 
+  // Drawing and annotation tools
+  let penModeActive = false;
+  let boxModeActive = false;
+  let isDrawing = false;
+  let currentPath = null;
+  let currentBox = null;
+  let drawingCanvas = null;
+  let annotations = [];
+  let penColor = '#ff0000';
+  let penWidth = 3;
+  let boxColor = '#0066cc';
+  let boxBorderWidth = 2;
+
   function buildSiteInfo() {
     return {
       url: location.href,
@@ -693,9 +706,10 @@
     // Step 1: Generate CSS rules from prompt (+selector), not a merge yet
     let selectorHint = '';
     try { selectorHint = JSON.parse(elemCtx).selector || ''; } catch (_) { selectorHint = ''; }
-    const genPrompt = `Write only CSS rules (no explanations) to satisfy: "${userPrompt}" for element: ${elemCtx}. Use selector ${selectorHint || 'from context'}. Add !important to properties. Output only valid CSS.`;
-    const genReq = { apiKey, model, prompt: genPrompt };
-    const genResp = await chrome.runtime.sendMessage({ action: 'morph-generate', payload: genReq });
+    const genPrompt = `Output only CSS for the following change: "${userPrompt}"\nTarget element context: ${elemCtx}\nUse selector ${selectorHint || 'from context'}; add !important. No prose, no fences, just CSS.`;
+    // Prefer a fast OpenAI-compatible model for generation
+    const genReq = { apiKey, model: 'gpt-5-nano', prompt: genPrompt, temperature: 0.2 };
+    const genResp = await chrome.runtime.sendMessage({ action: 'openai-generate', payload: genReq });
     let cssBlock = '';
     if (genResp && genResp.success) {
       cssBlock = String(genResp.data?.text || '');

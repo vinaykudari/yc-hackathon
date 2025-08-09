@@ -70,6 +70,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         .then(data => sendResponse({ success: true, data }))
         .catch(error => sendResponse({ success: false, error: error.message }));
       return true;
+
+    case 'openai-generate':
+      openaiGenerate(request.payload)
+        .then(data => sendResponse({ success: true, data }))
+        .catch(error => sendResponse({ success: false, error: error.message }));
+      return true;
   }
 });
 
@@ -171,6 +177,41 @@ async function morphGenerate(payload) {
   if (!response.ok) {
     const t = await response.text();
     throw new Error(`Morph Generate failed: ${response.status} ${response.statusText} - ${t.slice(0, 400)}`);
+  }
+  const data = await response.json();
+  const content = data?.choices?.[0]?.message?.content || '';
+  return { text: content, raw: data };
+}
+
+// Fast NL→CSS generation using OpenAI-compatible API (gpt-5-nano)
+async function openaiGenerate(payload) {
+  const { apiKey, model, prompt, temperature } = payload || {};
+  // Hardcoded per user request
+  const HARDCODED_OPENAI_KEY = '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';
+  const keyToUse = (apiKey && apiKey.trim()) || HARDCODED_OPENAI_KEY;
+  const genModel = model || 'gpt-5-nano';
+
+  const reqBody = {
+    model: genModel,
+    messages: [
+      { role: 'user', content: String(prompt || '') }
+    ],
+    temperature: typeof temperature === 'number' ? temperature : 0.2,
+    max_tokens: 512,
+    top_p: 1
+  };
+
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${keyToUse}`
+    },
+    body: JSON.stringify(reqBody)
+  });
+  if (!response.ok) {
+    const t = await response.text();
+    throw new Error(`OpenAI generate failed: ${response.status} ${response.statusText} - ${t.slice(0, 400)}`);
   }
   const data = await response.json();
   const content = data?.choices?.[0]?.message?.content || '';
