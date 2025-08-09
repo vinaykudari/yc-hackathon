@@ -15,6 +15,11 @@ document.addEventListener('DOMContentLoaded', function() {
   const applyCssPersonaBtn = document.getElementById('applyCssPersonaBtn');
   const applyJsPersonaBtn = document.getElementById('applyJsPersonaBtn');
   const applyHtmlPersonaBtn = document.getElementById('applyHtmlPersonaBtn');
+  const loadSiteInfoBtn = document.getElementById('loadSiteInfoBtn');
+  const selectElementBtn = document.getElementById('selectElementBtn');
+  const modifierInput = document.getElementById('modifierInput');
+  const applyTextBtn = document.getElementById('applyTextBtn');
+  const applyStyleBtn = document.getElementById('applyStyleBtn');
 
   // Initialize popup
   init();
@@ -37,6 +42,12 @@ document.addEventListener('DOMContentLoaded', function() {
     applyCssPersonaBtn.addEventListener('click', () => handleApply('css'));
     applyJsPersonaBtn.addEventListener('click', () => handleApply('js'));
     applyHtmlPersonaBtn.addEventListener('click', () => handleApply('html'));
+
+    // On-page editor actions
+    loadSiteInfoBtn.addEventListener('click', handleLoadSiteInfo);
+    selectElementBtn.addEventListener('click', handleSelectElement);
+    applyTextBtn.addEventListener('click', handleApplyText);
+    applyStyleBtn.addEventListener('click', handleApplyStyleViaMorph);
   }
 
   async function handlePreviewDOM() {
@@ -76,6 +87,159 @@ document.addEventListener('DOMContentLoaded', function() {
     } catch (error) {
       console.error('DOM preview failed:', error);
       updateStatus(`Preview failed: ${error.message}`, 'error');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleLoadSiteInfo() {
+    setLoading(true);
+    updateStatus('Loading site info...', 'loading');
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      let resp;
+      try {
+        resp = await chrome.tabs.sendMessage(tab.id, { action: 'load-site-info' });
+      } catch (err) {
+        if (String(err).includes('Receiving end does not exist')) {
+          await ensureContentScriptInjected(tab.id, tab.url);
+          resp = await chrome.tabs.sendMessage(tab.id, { action: 'load-site-info' });
+        } else {
+          throw err;
+        }
+      }
+      if (!resp || !resp.success) throw new Error(resp?.error || 'Failed to load site info');
+      displayResults('Site Info', resp.data);
+      updateStatus('Site info loaded', 'success');
+    } catch (e) {
+      console.error(e);
+      updateStatus(`Load failed: ${e.message}`, 'error');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleSelectElement() {
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      // Ask page to show overlay editor first so popup can close without losing controls
+      try {
+        await chrome.tabs.sendMessage(tab.id, { action: 'show-editor-overlay' });
+      } catch (err) {
+        if (String(err).includes('Receiving end does not exist')) {
+          await ensureContentScriptInjected(tab.id, tab.url);
+          await chrome.tabs.sendMessage(tab.id, { action: 'show-editor-overlay' });
+        }
+      }
+      let resp;
+      try {
+        resp = await chrome.tabs.sendMessage(tab.id, { action: 'enter-select-mode' });
+      } catch (err) {
+        if (String(err).includes('Receiving end does not exist')) {
+          await ensureContentScriptInjected(tab.id, tab.url);
+          resp = await chrome.tabs.sendMessage(tab.id, { action: 'enter-select-mode' });
+        } else {
+          throw err;
+        }
+      }
+      if (!resp || !resp.success) throw new Error(resp?.error || 'Failed to enter select mode');
+      updateStatus('Select mode: click an element on the page', 'success');
+    } catch (e) {
+      console.error(e);
+      updateStatus(`Select mode failed: ${e.message}`, 'error');
+    }
+  }
+
+  async function handleApplyText() {
+    const text = (modifierInput?.value || '').trim();
+    if (!text) { updateStatus('Enter text to apply', 'error'); return; }
+    setLoading(true);
+    updateStatus('Applying text to selected element...', 'loading');
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      let resp;
+      try {
+        resp = await chrome.tabs.sendMessage(tab.id, { action: 'apply-text-to-selected', text });
+      } catch (err) {
+        if (String(err).includes('Receiving end does not exist')) {
+          await ensureContentScriptInjected(tab.id, tab.url);
+          resp = await chrome.tabs.sendMessage(tab.id, { action: 'apply-text-to-selected', text });
+        } else {
+          throw err;
+        }
+      }
+      if (!resp || !resp.success) throw new Error(resp?.error || 'No element selected');
+      updateStatus('Text applied', 'success');
+    } catch (e) {
+      console.error(e);
+      updateStatus(`Apply text failed: ${e.message}`, 'error');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleApplyStyleViaMorph() {
+    const prompt = (modifierInput?.value || '').trim();
+    if (!prompt) { updateStatus('Enter a style change prompt', 'error'); return; }
+
+    setLoading(true);
+    updateStatus('Getting selected element context...', 'loading');
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      // Ask content for selected element info
+      let sel;
+      try {
+        sel = await chrome.tabs.sendMessage(tab.id, { action: 'get-selected-element-context' });
+      } catch (err) {
+        if (String(err).includes('Receiving end does not exist')) {
+          await ensureContentScriptInjected(tab.id, tab.url);
+          sel = await chrome.tabs.sendMessage(tab.id, { action: 'get-selected-element-context' });
+        } else {
+          throw err;
+        }
+      }
+      if (!sel || !sel.success) throw new Error(sel?.error || 'No element selected');
+
+      const elementContext = JSON.stringify(sel.data || {});
+
+      // Build a tiny CSS patch request
+      const origin = new URL(tab.url).origin;
+      const storageKey = `site_css::${origin}`;
+      const stored = await chrome.storage.local.get([storageKey]);
+      let baseCss = String(stored[storageKey] || '/* morph site.css */\n');
+      baseCss = baseCss.slice(0, 6 * 1024);
+
+      const instruction = `I will write minimal CSS rules to satisfy the user's style request for the provided element. Use the most stable selector(s). Keep changes additive; do not remove rules.\n\nUser request: ${prompt}\n\nElement context (JSON): ${elementContext}`;
+
+      const { morphSettings } = await chrome.storage.sync.get(['morphSettings']);
+      const apiKey = morphSettings?.apiKey || '';
+      const model = morphSettings?.model || 'morph-v3-fast';
+
+      const payload = { apiKey, model, kind: 'css', instruction, original: baseCss, update: '/* add rules below */' };
+      updateStatus('Calling Morph for CSS patch...', 'loading');
+      const morphResp = await chrome.runtime.sendMessage({ action: 'morph-apply', payload });
+      if (!morphResp || !morphResp.success) throw new Error(morphResp?.error || 'Morph failed');
+      const finalCss = (morphResp.data?.final_code || morphResp.data?.content || morphResp.data || '').slice(0, 16 * 1024);
+      if (!finalCss) throw new Error('Empty CSS from Morph');
+
+      await chrome.storage.local.set({ [storageKey]: finalCss });
+      let inject;
+      try {
+        inject = await chrome.tabs.sendMessage(tab.id, { action: 'inject-css', css: finalCss });
+      } catch (err) {
+        if (String(err).includes('Receiving end does not exist')) {
+          await ensureContentScriptInjected(tab.id, tab.url);
+          inject = await chrome.tabs.sendMessage(tab.id, { action: 'inject-css', css: finalCss });
+        } else {
+          throw err;
+        }
+      }
+      if (!inject || !inject.success) throw new Error(inject?.error || 'Inject failed');
+
+      updateStatus('Style applied via Morph', 'success');
+    } catch (e) {
+      console.error(e);
+      updateStatus(`Style change failed: ${e.message}`, 'error');
     } finally {
       setLoading(false);
     }

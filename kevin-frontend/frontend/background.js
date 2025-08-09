@@ -16,11 +16,8 @@ chrome.runtime.onInstalled.addListener((details) => {
   // Create context menu items (with error handling)
   try {
     if (chrome.contextMenus) {
-      chrome.contextMenus.create({
-        id: 'preview-dom',
-        title: 'Preview current DOM',
-        contexts: ['page']
-      });
+      chrome.contextMenus.create({ id: 'morph-open-editor', title: 'Open Morph Editor', contexts: ['page'] });
+      chrome.contextMenus.create({ id: 'morph-select-mode', title: 'Enter Select Mode', contexts: ['page'] });
     }
   } catch (error) {
     console.log('Context menus not available:', error);
@@ -32,8 +29,12 @@ if (chrome.contextMenus && chrome.contextMenus.onClicked) {
   chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     try {
       switch (info.menuItemId) {
-        case 'preview-dom':
-          await handlePreviewDOMFromContext(tab);
+        case 'morph-open-editor':
+          await ensureMessage(tab, { action: 'show-editor-overlay' });
+          break;
+        case 'morph-select-mode':
+          await ensureMessage(tab, { action: 'show-editor-overlay' });
+          await ensureMessage(tab, { action: 'enter-select-mode' });
           break;
       }
     } catch (error) {
@@ -63,28 +64,25 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         .then(data => sendResponse({ success: true, data }))
         .catch(error => sendResponse({ success: false, error: error.message }));
       return true;
+
+    case 'morph-generate':
+      morphGenerate(request.payload)
+        .then(data => sendResponse({ success: true, data }))
+        .catch(error => sendResponse({ success: false, error: error.message }));
+      return true;
   }
 });
 
-// Handle DOM preview from context menu
-async function handlePreviewDOMFromContext(tab) {
+// Ensure messaging to content script; inject if needed then retry
+async function ensureMessage(tab, message) {
   try {
-    const response = await chrome.tabs.sendMessage(tab.id, {
-      action: 'get-dom-info'
-    });
-
-    if (response.success) {
-      console.log('DOM Info:', response.data);
-      // Could open a new tab with DOM info or show notification
-      chrome.notifications.create({
-        type: 'basic',
-        iconUrl: 'icons/icon48.png',
-        title: 'DOM Preview',
-        message: `Page has ${response.data.elementCounts.total} elements`
-      });
+    return await chrome.tabs.sendMessage(tab.id, message);
+  } catch (err) {
+    if (String(err).includes('Receiving end does not exist')) {
+      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content.js'] });
+      return await chrome.tabs.sendMessage(tab.id, message);
     }
-  } catch (error) {
-    console.error('Context menu DOM preview failed:', error);
+    throw err;
   }
 }
 
@@ -146,6 +144,37 @@ async function morphApply(payload) {
   // Expect final code to be in message content
   const content = data?.choices?.[0]?.message?.content || '';
   return { final_code: content, raw: data };
+}
+
+// General generation call (not Apply): returns raw text from the model
+async function morphGenerate(payload) {
+  const { apiKey, model, prompt } = payload || {};
+  const HARDCODED_API_KEY = 'sk-RpSLhRtM_IjLIZdJOYZc36NlZDkxnImXwxqtY0g4UF7ZTOZ3';
+  const keyToUse = (apiKey && apiKey.trim()) || HARDCODED_API_KEY;
+  const genModel = model || 'morph-v3-fast';
+
+  const reqBody = {
+    model: genModel,
+    messages: [
+      { role: 'user', content: String(prompt || '') }
+    ]
+  };
+
+  const response = await fetch('https://api.morphllm.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${keyToUse}`
+    },
+    body: JSON.stringify(reqBody)
+  });
+  if (!response.ok) {
+    const t = await response.text();
+    throw new Error(`Morph Generate failed: ${response.status} ${response.statusText} - ${t.slice(0, 400)}`);
+  }
+  const data = await response.json();
+  const content = data?.choices?.[0]?.message?.content || '';
+  return { text: content, raw: data };
 }
 
 // Tab update listener for potential auto-processing
@@ -217,7 +246,18 @@ try {
 
 // Handle extension icon click (optional - could show badge or status)
 chrome.action.onClicked.addListener(async (tab) => {
-  // This would only fire if no popup is defined
-  // Since we have a popup, this won't be called
-  console.log('Extension icon clicked on:', tab.url);
+  try {
+    if (tab.id && tab.url && !tab.url.startsWith('chrome://')) {
+      try {
+        await chrome.tabs.sendMessage(tab.id, { action: 'show-editor-overlay' });
+      } catch (err) {
+        if (String(err).includes('Receiving end does not exist')) {
+          await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content.js'] });
+          await chrome.tabs.sendMessage(tab.id, { action: 'show-editor-overlay' });
+        }
+      }
+    }
+  } catch (e) {
+    console.error('Failed to open editor overlay:', e);
+  }
 });
