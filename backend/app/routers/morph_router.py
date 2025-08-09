@@ -18,10 +18,10 @@ class MorphRequest(BaseModel):
 @router.post("/morph")
 async def morph(req: MorphRequest):
     res = fetch_instructions(req.persona_id)
-    print(res)
+    print(req.prompt)
     try:
         content = "<instruction>{}</instruction>\n<code>{}</code>\n<update>{}</update>".format(
-            res.get("instructions"), req.prompt, res.get("code_snippet")
+            res.get("instructions"), req.prompt, res.get("update_instructions")
         )
         resp =  client.chat.completions.create(
             model=req.model or "morph-v3-fast",
@@ -32,6 +32,7 @@ async def morph(req: MorphRequest):
                 }
             ],
         )
-        return {"content": resp.choices[0].message.content}
+        resp = resp.choices[0].message.content
+        return {"content": resp}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

@@ -1,44 +1,30 @@
+from openai import OpenAI
+import os
+
 def fetch_instructions(persona_id):
     return {
         "instructions": """
-        1) Locate the hero heading: prefer the element with id "hero-title"; if not present, use the first h1 inside the main content area.
-        2) Replace its text content with "Welcome to Morph Demo".
-        3) Immediately after the hero heading, insert the CTA button markup from the code snippet below.
-        4) Add the CSS rules from the code snippet: if a <style id="morph-patch"> exists in <head>, append rules to it; otherwise add a new <style id="morph-patch"> as the last child of <head>.
-        5) The button must link to /signup and be keyboard accessible.
-        6) Do not alter any other content, attributes, or whitespace.
-        <!-- HTML: desired state near the hero -->
-        <h1 id="hero-title">Welcome to Morph Demo</h1>
-        <a
-          id="cta-button"
-          class="btn btn-primary"
-          href="/signup"
-          aria-label="Get Started"
-        >
-          Get Started
-        </a>
-        
-        <!-- CSS: append to <style id="morph-patch"> in <head>, or create it if missing -->
+        Apply the update instructions
         
         """,
-        "code_snippet": """
-            <style id="morph-patch">
-              #cta-button.btn.btn-primary {
-                display: inline-block;
-                margin-top: 12px;
-                padding: 10px 16px;
-                background: #2563eb;
-                color: #ffffff;
-                text-decoration: none;
-                border-radius: 8px;
-                font-weight: 600;
-                transition: background 0.15s ease;
-              }
-              #cta-button.btn.btn-primary:hover,
-              #cta-button.btn.btn-primary:focus {
-                background: #1d4ed8;
-                outline: none;
-              }
-            </style>
+        "update_instructions": """
+            body {background-color: red}
         """
     }
+
+def morph(code, instruction):
+    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    content = """
+    
+    """
+    resp =  client.chat.completions.create(
+        model="",
+        messages=[
+            {
+                "role": "user",
+                "content": content
+            }
+        ],
+    )
+    resp = resp.choices[0].message.content
+    return {"content": resp}

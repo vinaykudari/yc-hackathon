@@ -1,68 +1,295 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>DOM API Updater</title>
-  <link rel="stylesheet" href="popup.css">
+  <meta charset="utf-8">
+  <style>
+    body {
+      width: 450px;
+      padding: 15px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      margin: 0;
+      background: #f8f9fa;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 20px;
+      padding-bottom: 15px;
+      border-bottom: 2px solid #e9ecef;
+    }
+
+    .header h1 {
+      margin: 0;
+      font-size: 20px;
+      color: #212529;
+      font-weight: 600;
+    }
+
+    .section {
+      margin-bottom: 15px;
+      padding: 15px;
+      border: 1px solid #dee2e6;
+      border-radius: 8px;
+      background: white;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .section h3 {
+      margin: 0 0 12px 0;
+      font-size: 14px;
+      color: #495057;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .input-group {
+      margin-bottom: 12px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 12px;
+      color: #6c757d;
+      font-weight: 500;
+    }
+
+    input, textarea, select {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #ced4da;
+      border-radius: 6px;
+      font-size: 13px;
+      box-sizing: border-box;
+      transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+    }
+
+    input:focus, textarea:focus, select:focus {
+      outline: none;
+      border-color: #80bdff;
+      box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    }
+
+    textarea {
+      min-height: 70px;
+      resize: vertical;
+      font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+      font-size: 11px;
+    }
+
+    button {
+      background: linear-gradient(135deg, #007bff, #0056b3);
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      width: 100%;
+      margin-top: 5px;
+      transition: all 0.2s ease;
+    }
+
+    button:hover:not(:disabled) {
+      background: linear-gradient(135deg, #0056b3, #004085);
+      transform: translateY(-1px);
+    }
+
+    button:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    button:disabled {
+      background: #6c757d;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    button.secondary {
+      background: linear-gradient(135deg, #6c757d, #545b62);
+    }
+
+    button.danger {
+      background: linear-gradient(135deg, #dc3545, #c82333);
+    }
+
+    button.success {
+      background: linear-gradient(135deg, #28a745, #1e7e34);
+    }
+
+    .status-message {
+      margin-top: 10px;
+      padding: 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      display: none;
+    }
+
+    .status-message.success {
+      background: #d1ecf1;
+      color: #0c5460;
+      border: 1px solid #bee5eb;
+    }
+
+    .status-message.error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+
+    .status-message.loading {
+      background: #fff3cd;
+      color: #856404;
+      border: 1px solid #ffeaa7;
+    }
+
+    .status-message.info {
+      background: #d1ecf1;
+      color: #0c5460;
+      border: 1px solid #bee5eb;
+    }
+
+    .quick-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .quick-actions button {
+      font-size: 11px;
+      padding: 8px 10px;
+    }
+
+    .progress {
+      display: none;
+      margin: 10px 0;
+      padding: 8px;
+      background: #e9ecef;
+      border-radius: 4px;
+      text-align: center;
+      font-size: 12px;
+      color: #495057;
+    }
+
+    .results {
+      display: none;
+      margin-top: 15px;
+      padding: 12px;
+      background: #f8f9fa;
+      border: 1px solid #dee2e6;
+      border-radius: 6px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .results h4 {
+      margin: 0 0 8px 0;
+      font-size: 13px;
+      color: #495057;
+    }
+
+    .results pre {
+      margin: 0;
+      font-size: 10px;
+      line-height: 1.4;
+      color: #495057;
+      white-space: pre-wrap;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+  </style>
 </head>
 <body>
-  <div class="container">
-    <header>
-      <h1>DOM API Updater</h1>
-      <p class="subtitle">Send & Update DOM via API</p>
-    </header>
-    
-    <main>
-      <div class="api-config">
-        <h2>API Configuration</h2>
-        <div class="input-group">
-          <label for="apiUrl">API Endpoint:</label>
-          <input type="text" id="apiUrl" placeholder="http://0.0.0.0:8000/test-api" value="http://0.0.0.0:8000/test-api">
-        </div>
-        <div class="input-group">
-          <label for="apiMethod">Method:</label>
-          <select id="apiMethod">
-            <option value="POST">POST</option>
-            <option value="PUT">PUT</option>
-          </select>
-        </div>
-      </div>
-      
-      <div class="actions">
-        <button id="updateDomBtn" class="action-btn primary">
-          <span class="icon">🔄</span>
-          Update DOM via API
-        </button>
-        <button id="previewBtn" class="action-btn secondary">
-          <span class="icon">👁️</span>
-          Preview Current DOM
-        </button>
-      </div>
-      
-      <div class="status-section">
-        <div id="status" class="status-message">
-          Ready to update DOM
-        </div>
-        <div id="progress" class="progress-bar" style="display: none;">
-          <div class="progress-fill"></div>
-        </div>
-      </div>
-      
-      <div class="results-section" id="results" style="display: none;">
-        <h3>Response Info</h3>
-        <div id="resultsContent"></div>
-      </div>
-    </main>
-    
-    <footer>
-      <div class="settings">
-        <button id="settingsBtn" class="settings-btn">⚙️ Settings</button>
-        <button id="helpBtn" class="settings-btn">❓ Help</button>
-      </div>
-    </footer>
+  <div class="header">
+    <h1>DOM API Updater</h1>
   </div>
-  
+
+  <!-- Morph API Section -->
+  <div class="section">
+    <h3>🔄 Morph API Transform</h3>
+    <div class="input-group">
+      <label for="apiUrl">API Endpoint URL:</label>
+      <input type="text" id="apiUrl" value="http://localhost:8000/morph" placeholder="http://localhost:8000/morph">
+    </div>
+    <div class="grid-2">
+      <div class="input-group">
+        <label for="modelSelect">Model:</label>
+        <select id="modelSelect">
+          <option value="morph-v3-fast">morph-v3-fast</option>
+          <option value="morph-v3-large">morph-v3-large</option>
+        </select>
+      </div>
+      <div class="input-group">
+        <label for="personaId">Persona ID:</label>
+        <input type="text" id="personaId" value="1" placeholder="1">
+      </div>
+    </div>
+    <button id="morphBtn">🚀 Transform Page</button>
+    <div class="grid-2" style="margin-top: 8px;">
+      <button id="updateDomBtn" class="secondary">📤 Legacy Update</button>
+      <button id="previewBtn" class="secondary">👁️ Preview DOM</button>
+    </div>
+  </div>
+
+  <!-- Direct Content Application -->
+  <div class="section">
+    <h3>⚡ Direct Code Application</h3>
+
+    <div class="input-group">
+      <label for="cssContent">CSS:</label>
+      <textarea id="cssContent" placeholder="body { background: #f0f8ff; }"></textarea>
+      <button id="applyCssBtn" class="success">Apply CSS</button>
+    </div>
+
+    <div class="input-group">
+      <label for="jsContent">JavaScript:</label>
+      <textarea id="jsContent" placeholder="console.log('Hello!'); alert('JS Applied!');"></textarea>
+      <button id="applyJsBtn" class="success">Apply JavaScript</button>
+    </div>
+
+    <div class="input-group">
+      <label for="htmlContent">HTML:</label>
+      <textarea id="htmlContent" placeholder="<div style='padding:20px; background:#e7f3ff; margin:10px; border-radius:8px;'>New Content!</div>"></textarea>
+      <button id="applyHtmlBtn" class="success">Apply HTML</button>
+    </div>
+  </div>
+
+  <!-- Quick Actions -->
+  <div class="section">
+    <h3>🛠️ Quick Actions</h3>
+    <div class="quick-actions">
+      <button id="clearInjectedBtn" class="danger">🗑️ Clear Injected</button>
+      <button id="settingsBtn" class="secondary">⚙️ Settings</button>
+      <button id="helpBtn" class="secondary">❓ Help</button>
+      <button id="refreshBtn" class="secondary">🔄 Refresh</button>
+    </div>
+  </div>
+
+  <!-- Method Selection (for legacy compatibility) -->
+  <div class="section" style="display: none;">
+    <div class="input-group">
+      <label for="apiMethod">HTTP Method:</label>
+      <select id="apiMethod">
+        <option value="POST">POST</option>
+        <option value="PUT">PUT</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Status and Results -->
+  <div class="progress" id="progress">Processing...</div>
+  <div class="status-message" id="status"></div>
+  <div class="results" id="results">
+    <div id="resultsContent"></div>
+  </div>
+
   <script src="popup.js"></script>
 </body>
 </html>

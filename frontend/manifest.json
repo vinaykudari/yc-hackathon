@@ -1,31 +1,37 @@
 {
   "manifest_version": 3,
   "name": "DOM API Updater",
-  "version": "1.0.0",
-  "description": "Chrome extension that sends DOM to API and updates page with response",
+  "version": "2.0.0",
+  "description": "Chrome extension that applies CSS, JavaScript, and HTML content to web pages via API transformations",
+
   "permissions": [
     "activeTab",
     "storage",
     "scripting",
     "contextMenus",
-    "notifications",
-    "alarms"
+    "notifications"
   ],
+
   "host_permissions": [
-    "https://*/*",
-    "http://*/*"
+    "http://localhost/*",
+    "https://localhost/*",
+    "http://127.0.0.1/*",
+    "https://127.0.0.1/*"
   ],
+
   "background": {
     "service_worker": "background.js"
   },
+
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
       "js": ["content.js"],
-      "css": ["content.css"],
-      "run_at": "document_end"
+      "run_at": "document_end",
+      "all_frames": false
     }
   ],
+
   "action": {
     "default_popup": "popup.html",
     "default_title": "DOM API Updater",
@@ -36,15 +42,17 @@
       "128": "icons/icon128.png"
     }
   },
+
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
+
   "web_accessible_resources": [
     {
-      "resources": ["icons/*"],
+      "resources": ["content.js"],
       "matches": ["<all_urls>"]
     }
   ]
