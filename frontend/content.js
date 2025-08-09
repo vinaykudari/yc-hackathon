@@ -51,15 +51,16 @@
       console.log('Serialized DOM length:', currentDOM.length);
 
       // Step 2: Send DOM to API
-      const response = await sendDOMToAPI(apiUrl, currentDOM, method);
+      const apiResponse = await sendDOMToAPI(apiUrl, currentDOM, method);
       console.log('API response received');
 
       // Step 3: Replace DOM with API response
-      replaceDOM(response);
+      replaceDOM(apiResponse.content);
 
       return {
-        responseSize: response.length,
-        originalSize: currentDOM.length
+        responseSize: apiResponse.content.length,
+        originalSize: currentDOM.length,
+        metadata: apiResponse.metadata
       };
 
     } catch (error) {
@@ -103,7 +104,7 @@
       method: method,
       headers: {
         'Content-Type': 'text/html',
-        'Accept': 'text/html',
+        'Accept': 'application/json',
         'X-Requested-With': 'XMLHttpRequest'
       },
       body: domContent,
@@ -116,13 +117,19 @@
       throw new Error(`API request failed: ${response.status} ${response.statusText}`);
     }
 
-    const responseText = await response.text();
+    const responseData = await response.json();
     
-    if (!responseText || responseText.trim().length === 0) {
-      throw new Error('API returned empty response');
+    if (!responseData || !responseData.content) {
+      throw new Error('API returned invalid response format');
     }
 
-    return responseText;
+    console.log('API response metadata:', responseData.metadata);
+
+    // Return both content and metadata
+    return {
+      content: responseData.content,
+      metadata: responseData.metadata || {}
+    };
   }
 
   // Replace current DOM with new HTML content

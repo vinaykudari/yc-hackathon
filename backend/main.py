@@ -47,10 +47,10 @@ async def health_check():
     """Health check endpoint"""
     return {"status": "healthy", "timestamp": datetime.now().isoformat()}
 
-@app.post("/test-api", response_class=HTMLResponse)
+@app.post("/test-api")
 async def process_dom(request: Request):
     """
-    Main API endpoint that receives HTML content and returns modified HTML
+    Main API endpoint that receives HTML content and returns JSON with modified HTML
     This is the endpoint the Chrome extension calls
     """
     try:
@@ -69,22 +69,28 @@ async def process_dom(request: Request):
         
         logger.info(f"Returning modified HTML: {len(modified_html)} characters")
         
-        return HTMLResponse(
-            content=modified_html,
-            status_code=200,
-            headers={
-                "Content-Type": "text/html; charset=utf-8",
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "POST, PUT, OPTIONS",
-                "Access-Control-Allow-Headers": "Content-Type, Accept, X-Requested-With"
+        # Return JSON response with HTML content
+        return {
+            "content": modified_html,
+            "metadata": {
+                "original_length": len(html_string),
+                "modified_length": len(modified_html),
+                "timestamp": datetime.now().isoformat(),
+                "modifications": [
+                    "Added top banner with timestamp",
+                    "Modified page title",
+                    "Added gradient highlights to H1 elements",
+                    "Added footer badge",
+                    "Added custom CSS styles"
+                ]
             }
-        )
+        }
         
     except Exception as e:
         logger.error(f"Error processing DOM: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error processing HTML: {str(e)}")
 
-@app.put("/test-api", response_class=HTMLResponse)
+@app.put("/test-api")
 async def process_dom_put(request: Request):
     """PUT version of the test-api endpoint"""
     return await process_dom(request)
