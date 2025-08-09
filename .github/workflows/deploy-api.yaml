@@ -3,9 +3,7 @@ name: Deploy API
 on:
   push:
     branches: [main]
-    paths:
-      - 'apps/backend/**'          # only runs when these files change
-      - '.github/workflows/deploy-api.yml'
+  workflow_dispatch:
 
 jobs:
   api:
@@ -19,7 +17,7 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - uses: docker/build-push-action@v5
         with:
-          context: apps/web-api
+          context: backend
           push: true
           tags: vinaykudari/yc-api:latest
       - name: Install Koyeb CLI
@@ -28,4 +26,4 @@ jobs:
           tar -xzf koyeb.tar.gz
           sudo mv koyeb /usr/local/bin/koyeb
       - name: Redeploy API
-        run: koyeb service redeploy awake-lauraine/sfeyes-api --token ${{ secrets.KOYEB_TOKEN_API }}
+        run: koyeb service redeploy awake-lauraine/yc-api --token ${{ secrets.KOYEB_TOKEN_API }}
