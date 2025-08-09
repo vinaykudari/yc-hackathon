@@ -9,4 +9,4 @@ app.include_router(morph_router.router, prefix="/api/v1", tags=["morph"])
 
 @app.get("/health")
 def health_check():
-    return {"status": "OK"}
+    return {"status": "ok"}
