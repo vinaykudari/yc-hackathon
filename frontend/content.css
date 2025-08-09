@@ -1,0 +1,160 @@
+/* Content script styles for DOM API Updater Chrome Extension */
+
+/* Update indicator styles */
+#dom-update-indicator {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  pointer-events: none !important;
+}
+
+/* Ensure indicator stays on top */
+#dom-update-indicator {
+  z-index: 2147483647 !important;
+}
+
+/* Loading overlay for DOM updates */
+.dom-update-overlay {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  background: rgba(0, 0, 0, 0.5) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  z-index: 2147483646 !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+}
+
+.dom-update-spinner {
+  background: white !important;
+  padding: 30px !important;
+  border-radius: 12px !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3) !important;
+  text-align: center !important;
+  max-width: 300px !important;
+}
+
+.dom-update-spinner h3 {
+  margin: 0 0 15px 0 !important;
+  color: #2c3e50 !important;
+  font-size: 18px !important;
+  font-weight: 600 !important;
+}
+
+.dom-update-spinner p {
+  margin: 0 0 20px 0 !important;
+  color: #6c757d !important;
+  font-size: 14px !important;
+}
+
+.spinner {
+  width: 40px !important;
+  height: 40px !important;
+  border: 4px solid #f3f3f3 !important;
+  border-top: 4px solid #667eea !important;
+  border-radius: 50% !important;
+  animation: spin 1s linear infinite !important;
+  margin: 0 auto !important;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Error indicator */
+.dom-update-error {
+  position: fixed !important;
+  top: 20px !important;
+  right: 20px !important;
+  background: linear-gradient(135deg, #ff6b6b, #ee5a24) !important;
+  color: white !important;
+  padding: 12px 20px !important;
+  border-radius: 8px !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  z-index: 2147483647 !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+  animation: slideIn 0.3s ease !important;
+  max-width: 300px !important;
+}
+
+/* Success indicator */
+.dom-update-success {
+  position: fixed !important;
+  top: 20px !important;
+  right: 20px !important;
+  background: linear-gradient(135deg, #43e97b, #38f9d7) !important;
+  color: white !important;
+  padding: 12px 20px !important;
+  border-radius: 8px !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  z-index: 2147483647 !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+  animation: slideIn 0.3s ease !important;
+  max-width: 300px !important;
+}
+
+@keyframes slideIn {
+  from { 
+    transform: translateX(100%) !important; 
+    opacity: 0 !important; 
+  }
+  to { 
+    transform: translateX(0) !important; 
+    opacity: 1 !important; 
+  }
+}
+
+/* Prevent conflicts with page styles */
+#dom-update-indicator,
+.dom-update-overlay,
+.dom-update-error,
+.dom-update-success {
+  all: initial !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .dom-update-spinner {
+    background: #2c3e50 !important;
+    color: white !important;
+  }
+  
+  .dom-update-spinner h3 {
+    color: white !important;
+  }
+  
+  .dom-update-spinner p {
+    color: #bdc3c7 !important;
+  }
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  #dom-update-indicator,
+  .dom-update-error,
+  .dom-update-success {
+    top: 10px !important;
+    right: 10px !important;
+    left: 10px !important;
+    max-width: none !important;
+    font-size: 13px !important;
+    padding: 10px 16px !important;
+  }
+  
+  .dom-update-spinner {
+    margin: 20px !important;
+    padding: 20px !important;
+    max-width: none !important;
+  }
+}

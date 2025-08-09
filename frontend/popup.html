@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DOM API Updater</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>DOM API Updater</h1>
+      <p class="subtitle">Send & Update DOM via API</p>
+    </header>
+    
+    <main>
+      <div class="api-config">
+        <h2>API Configuration</h2>
+        <div class="input-group">
+          <label for="apiUrl">API Endpoint:</label>
+          <input type="text" id="apiUrl" placeholder="https://your-api.com/test-api" value="/test-api">
+        </div>
+        <div class="input-group">
+          <label for="apiMethod">Method:</label>
+          <select id="apiMethod">
+            <option value="POST">POST</option>
+            <option value="PUT">PUT</option>
+          </select>
+        </div>
+      </div>
+      
+      <div class="actions">
+        <button id="updateDomBtn" class="action-btn primary">
+          <span class="icon">🔄</span>
+          Update DOM via API
+        </button>
+        <button id="previewBtn" class="action-btn secondary">
+          <span class="icon">👁️</span>
+          Preview Current DOM
+        </button>
+      </div>
+      
+      <div class="status-section">
+        <div id="status" class="status-message">
+          Ready to update DOM
+        </div>
+        <div id="progress" class="progress-bar" style="display: none;">
+          <div class="progress-fill"></div>
+        </div>
+      </div>
+      
+      <div class="results-section" id="results" style="display: none;">
+        <h3>Response Info</h3>
+        <div id="resultsContent"></div>
+      </div>
+    </main>
+    
+    <footer>
+      <div class="settings">
+        <button id="settingsBtn" class="settings-btn">⚙️ Settings</button>
+        <button id="helpBtn" class="settings-btn">❓ Help</button>
+      </div>
+    </footer>
+  </div>
+  
+  <script src="popup.js"></script>
+</body>
+</html>
