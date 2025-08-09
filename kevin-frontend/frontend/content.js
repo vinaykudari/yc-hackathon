@@ -690,64 +690,47 @@
     const { morphSettings } = await chrome.storage.sync.get(['morphSettings']);
     const apiKey = morphSettings?.apiKey || '';
     const model = morphSettings?.model || 'morph-v3-fast';
-    // Per request: allow using plain instructions in <code>, and let <instruction> be “apply to this component…”
-    const instruction = `Apply to this component the necessary changes in minimal CSS, using stable selectors. Keep it additive. Prefer using the provided selector verbatim and add !important to ensure the override takes effect. Output only valid CSS.`;
-    const code = `/* Current request and element context for reference */\n/* Request: ${userPrompt} */\n/* Context: ${elemCtx} */\n`;
-    const update = '/* add rules below */';
-    const applyPayload = { apiKey, model, kind: 'css', instruction, original: code, update };
-    lastMorphRequest = { model, kind: 'css', instruction, original_preview: code.slice(0, 500), update_preview: update, apiKeyProvided: Boolean(apiKey), contextLengths: { code: code.length, elemCtx: elemCtx.length } };
-    let finalCss = '';
+    // Step 1: Generate CSS rules from prompt (+selector), not a merge yet
+    let selectorHint = '';
+    try { selectorHint = JSON.parse(elemCtx).selector || ''; } catch (_) { selectorHint = ''; }
+    const genPrompt = `Write only CSS rules (no explanations) to satisfy: "${userPrompt}" for element: ${elemCtx}. Use selector ${selectorHint || 'from context'}. Add !important to properties. Output only valid CSS.`;
+    const genReq = { apiKey, model, prompt: genPrompt };
+    const genResp = await chrome.runtime.sendMessage({ action: 'morph-generate', payload: genReq });
+    let cssBlock = '';
+    if (genResp && genResp.success) {
+      cssBlock = String(genResp.data?.text || '');
+      lastMorphResponse = genResp.data;
+      lastUsedPath = 'generate';
+    }
+    cssBlock = cssBlock.replace(/```[a-zA-Z]*\n?|```/g, '').trim();
+    // If no usable block, synthesize basic declarations from prompt and wrap
+    if (!cssBlock) {
+      const decls = ensureImportantOnDecls(synthesizeDeclsFromPrompt(userPrompt));
+      const pathSel = buildCssPath(selectedElement);
+      const selList = [];
+      if (pathSel) selList.push(pathSel);
+      if (selectorHint) selList.push(selectorHint, `${selectorHint} *`);
+      cssBlock = `${(selList.length ? selList.join(', ') : '*')} { ${decls} }`;
+    }
+
+    // Step 2: Apply-merge the generated rules into site.css
+    const applyInstruction = 'I will add or update minimal CSS rules for the selected element.';
+    const updateSnippet = `/* ... existing code ... */\n${cssBlock}`;
+    const applyPayload = { apiKey, model, kind: 'css', instruction: applyInstruction, original: baseCss, update: updateSnippet };
+    lastMorphRequest = { model, kind: 'css', instruction: applyInstruction, original_preview: baseCss.slice(0, 200), update_preview: cssBlock.slice(0, 200), apiKeyProvided: Boolean(apiKey), contextLengths: { code: baseCss.length, gen: cssBlock.length } };
+    let mergedCss = '';
     try {
-      const resp = await chrome.runtime.sendMessage({ action: 'morph-apply', payload: applyPayload });
-      if (!resp || !resp.success) throw new Error(resp?.error || 'Morph apply failed');
-      lastMorphResponse = resp.data;
-      finalCss = (resp.data?.final_code || resp.data?.content || resp.data || '').slice(0, 16 * 1024);
-      lastUsedPath = 'apply';
+      const applyResp = await chrome.runtime.sendMessage({ action: 'morph-apply', payload: applyPayload });
+      if (!applyResp || !applyResp.success) throw new Error(applyResp?.error || 'Morph apply failed');
+      mergedCss = String(applyResp.data?.final_code || applyResp.data?.content || applyResp.data || '').trim();
+      lastUsedPath = 'generate+apply';
     } catch (e) {
+      // If apply fails, fall back to just injecting the generated block
+      mergedCss = `${baseCss}\n\n/* morph-appended */\n${cssBlock}\n`;
       lastMorphError = String(e);
     }
 
-    const isProbablyEcho = !finalCss || (!/\{|\}/.test(finalCss) && !/;\s*$/.test(finalCss));
-    if (isProbablyEcho) {
-      let selectorHint = '';
-      try { selectorHint = JSON.parse(elemCtx).selector || ''; } catch (_) { selectorHint = ''; }
-      const explicitPrompt = `Write only CSS rules (no explanations) to satisfy: "${userPrompt}" for the element described here: ${elemCtx}. Use the stable selector ${selectorHint || 'from context'}. Add !important to properties so styles win over existing ones. Output only CSS.`;
-      const genReq = { apiKey, model, prompt: explicitPrompt };
-      const genResp = await chrome.runtime.sendMessage({ action: 'morph-generate', payload: genReq });
-      if (genResp && genResp.success) {
-        finalCss = String(genResp.data?.text || '').slice(0, 16 * 1024);
-        lastMorphResponse = genResp.data;
-        lastUsedPath = 'generate';
-      }
-    }
-
-    // Clean simple fences if present (do not alter stored prompt)
-    finalCss = finalCss.replace(/```[a-zA-Z]*\n?|```/g, '').trim();
-    if (!finalCss) throw new Error('Empty CSS from Morph');
-
-    // If the response looks like plain declarations (no braces), scope it to the selected selector and add !important
-    let cssToInject = finalCss;
-    const hasBraces = /\{/.test(finalCss);
-    try {
-      const ctxObj = JSON.parse(elemCtx);
-      const sel = ctxObj.selector || '';
-      if (!hasBraces && sel) {
-        let decls = ensureImportantOnDecls(finalCss);
-        if (!decls || /^;+$/.test(decls)) {
-          // Nothing usable came back; synthesize basic declarations from the user prompt
-          decls = ensureImportantOnDecls(synthesizeDeclsFromPrompt(userPrompt));
-        }
-        // Build higher-specificity selector set: full path, element, descendants
-        const pathSel = buildCssPath(selectedElement);
-        const selList = [];
-        if (pathSel) selList.push(pathSel);
-        selList.push(sel);
-        selList.push(`${sel} *`);
-        cssToInject = `${selList.join(', ')} { ${decls} }`;
-      }
-    } catch (_) {
-      // ignore
-    }
+    const cssToInject = mergedCss && mergedCss.length > 0 ? mergedCss : cssBlock;
 
     await chrome.storage.local.set({ [storageKey]: cssToInject });
     try { lastInjectedSelector = JSON.parse(elemCtx).selector || ''; } catch (_) { lastInjectedSelector = ''; }
