@@ -1,0 +1,35 @@
+{
+  "personas": [
+    {
+      "id": "css-dark-mode",
+      "type": "css",
+      "name": "Dark Mode Refresh",
+      "description": "Convert the site's visual style to a tasteful dark theme with accessible contrast and subtle modern UI polish.",
+      "apply": {
+        "instruction": "I will apply a dark mode theme and modernize the visual style. Keep focus on accessibility, sufficient color contrast, and non-intrusive overrides. Prefer CSS variables and avoid breaking layout. Do not remove existing rules; only add or minimally adjust styles as needed.",
+        "update": "// ... existing code ...\n/* Dark mode theme variables and overrides */\n:root {\n  --morph-bg: #0f1115;\n  --morph-surface: #161a22;\n  --morph-text: #e6e9ef;\n  --morph-muted: #9aa4b2;\n  --morph-primary: #7aa2f7;\n  --morph-accent: #9ece6a;\n  --morph-border: rgba(255, 255, 255, 0.08);\n}\n\nhtml, body {\n  background: var(--morph-bg) !important;\n  color: var(--morph-text) !important;\n}\n\n/* Containers */\nheader, nav, section, article, aside, footer,\n.card, .panel, .container, .content, .box {\n  background: var(--morph-surface) !important;\n  color: var(--morph-text) !important;\n  border-color: var(--morph-border) !important;\n}\n\n/* Text */\nh1, h2, h3, h4, h5, h6, p, span, li, dt, dd, label, small {\n  color: var(--morph-text) !important;\n}\n\n/* Muted text */\nsub, sup, .muted, .text-muted, .hint, .help, .description {\n  color: var(--morph-muted) !important;\n}\n\n/* Links */\na, a:visited {\n  color: var(--morph-primary) !important;\n}\na:hover {\n  color: #a5b8ff !important;\n}\n\n/* Inputs */\ninput, select, textarea {\n  background: #0f131a !important;\n  color: var(--morph-text) !important;\n  border: 1px solid var(--morph-border) !important;\n}\n\n/* Buttons */\nbutton, .btn {\n  background: #1b2230 !important;\n  color: var(--morph-text) !important;\n  border: 1px solid var(--morph-border) !important;\n  border-radius: 8px !important;\n}\nbutton:hover, .btn:hover {\n  filter: brightness(1.1) !important;\n}\n\n/* Tables */\ntable {\n  border-color: var(--morph-border) !important;\n}\nth, td {\n  border-color: var(--morph-border) !important;\n  color: var(--morph-text) !important;\n}\n\n/* Code blocks */\npre, code {\n  background: #10141b !important;\n  color: #e3e8f5 !important;\n  border: 1px solid var(--morph-border) !important;\n}\n\n/* Elevation */\n.card, .panel, .box, .popover, .tooltip {\n  box-shadow: 0 8px 24px rgba(0,0,0,0.35) !important;\n}\n"
+      }
+    },
+    {
+      "id": "css-rounded-modern",
+      "type": "css",
+      "name": "Rounded Modern UI",
+      "description": "Add rounded corners, soft shadows, and smooth transitions to give the site a modern feel.",
+      "apply": {
+        "instruction": "I will add modern rounded UI polish: consistent border-radius, soft shadows, and hover transitions. Avoid layout shifts and preserve sizing. Do not remove existing rules; append minimal overrides.",
+        "update": "// ... existing code ...\n/* Rounded modern UI polish */\n:root {\n  --morph-radius: 12px;\n  --morph-shadow: 0 10px 24px rgba(0,0,0,0.12);\n  --morph-transition: 180ms ease;\n}\n\nbutton, .btn, input, select, textarea, .card, .panel, .box, .chip, .tag, .badge, .modal, .dropdown, .tooltip {\n  border-radius: var(--morph-radius) !important;\n  transition: all var(--morph-transition) !important;\n}\n\n.card, .panel, .box, .popover, .dropdown-menu {\n  box-shadow: var(--morph-shadow) !important;\n  border: 1px solid rgba(0,0,0,0.06) !important;\n}\n\nbutton:hover, .btn:hover {\n  transform: translateY(-1px);\n  box-shadow: 0 12px 30px rgba(0,0,0,0.14) !important;\n}\n\ninput:focus, select:focus, textarea:focus, button:focus, .btn:focus {\n  outline: none !important;\n  box-shadow: 0 0 0 3px rgba(102,126,234,0.18) !important;\n}"
+      }
+    },
+    {
+      "id": "css-high-contrast",
+      "type": "css",
+      "name": "High Contrast Accessibility",
+      "description": "Improve readability and accessibility with higher contrast and larger tap targets.",
+      "apply": {
+        "instruction": "I will increase contrast and improve accessibility: darker text, clearer borders, larger tap targets, and visible focus rings. Keep changes additive to avoid breaking layout.",
+        "update": "// ... existing code ...\n/* High contrast and a11y improvements */\n:root {\n  --hc-text: #111;\n  --hc-bg: #fff;\n  --hc-border: #111;\n  --hc-focus: #0a84ff;\n}\n\nbody {\n  color: var(--hc-text) !important;\n  background: var(--hc-bg) !important;\n}\n\na, a:visited {\n  color: #0a58ca !important;\n  text-decoration-thickness: 0.12em !important;\n}\n\nbutton, .btn, input, select, textarea {\n  min-height: 40px !important;\n  border: 2px solid var(--hc-border) !important;\n}\n\n*:focus {\n  outline: 3px solid var(--hc-focus) !important;\n  outline-offset: 2px !important;\n}\n\n.text-muted, .muted {\n  color: #333 !important;\n}"
+      }
+    }
+  ]
+}
+
