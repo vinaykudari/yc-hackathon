@@ -18,6 +18,7 @@ class MorphRequest(BaseModel):
 @router.post("/morph")
 async def morph(req: MorphRequest):
     res = fetch_instructions(req.persona_id)
+    print(res)
     try:
         content = "<instruction>{}</instruction>\n<code>{}</code>\n<update>{}</update>".format(
             res.get("instructions"), req.prompt, res.get("code_snippet")
