@@ -3,9 +3,7 @@ name: Deploy API
 on:
   push:
     branches: [main]
-    paths:
-      - 'backend/**'
-      - '.github/workflows/deploy-api.yml'
+  workflow_dispatch:
 
 jobs:
   api:
@@ -28,4 +26,4 @@ jobs:
           tar -xzf koyeb.tar.gz
           sudo mv koyeb /usr/local/bin/koyeb
       - name: Redeploy API
-        run: koyeb service redeploy awake-lauraine/sfeyes-api --token ${{ secrets.KOYEB_TOKEN_API }}
+        run: koyeb service redeploy awake-lauraine/yc-api --token ${{ secrets.KOYEB_TOKEN_API }}
