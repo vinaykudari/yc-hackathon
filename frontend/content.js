@@ -85,52 +85,51 @@
 
   // Send DOM to API endpoint
   async function sendDOMToAPI(apiUrl, domContent, method = 'POST') {
-    // Determine if URL is relative or absolute
     let fullUrl = apiUrl;
     if (apiUrl.startsWith('/')) {
-      // Relative URL - use current origin
-      fullUrl = window.location.origin + apiUrl;
+        fullUrl = window.location.origin + apiUrl;
     } else if (!apiUrl.startsWith('http')) {
-      // Assume it needs protocol
-      fullUrl = 'https://' + apiUrl;
+        fullUrl = 'https://' + apiUrl;
     }
-
-    // Fix 0.0.0.0 addresses which browsers can't access
     fullUrl = fullUrl.replace('://0.0.0.0:', '://localhost:');
 
     console.log('Sending DOM to:', fullUrl);
 
+    const jsonBody = {
+        prompt: domContent,  // Wrap HTML string as "prompt"
+        model: "morph-v3-fast"  // Optional, matches default
+    };
+
     const requestOptions = {
-      method: method,
-      headers: {
-        'Content-Type': 'text/html',
-        'Accept': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest'
-      },
-      body: domContent,
-      mode: 'cors'
+        method: method,
+        headers: {
+            'Content-Type': 'application/json',  // Change to JSON
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify(jsonBody),  // Stringify as JSON
+        mode: 'cors'
     };
 
     const response = await fetch(fullUrl, requestOptions);
 
     if (!response.ok) {
-      throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+        throw new Error(`API request failed: ${response.status} ${response.statusText}`);
     }
 
     const responseData = await response.json();
-    
+
     if (!responseData || !responseData.content) {
-      throw new Error('API returned invalid response format');
+        throw new Error('API returned invalid response format');
     }
 
     console.log('API response metadata:', responseData.metadata);
 
-    // Return both content and metadata
     return {
-      content: responseData.content,
-      metadata: responseData.metadata || {}
+        content: responseData.content,
+        metadata: responseData.metadata || {}
     };
-  }
+}
 
   // Replace current DOM with new HTML content
   function replaceDOM(htmlContent) {
