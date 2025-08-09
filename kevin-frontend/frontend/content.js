@@ -47,6 +47,12 @@
           .catch(err => sendResponse({ success: false, error: err.message }));
         return true;
 
+      case 'gather-css-min':
+        gatherCssMinimal()
+          .then(css => sendResponse({ success: true, data: { css } }))
+          .catch(err => sendResponse({ success: false, error: err.message }));
+        return true;
+
       case 'inject-css':
         try {
           injectCss(request.css || '');
@@ -277,6 +283,48 @@
     ].filter(Boolean).join('\n\n');
 
     return combined;
+  }
+
+  // Minimal CSS context to stay within model token limits
+  async function gatherCssMinimal() {
+    // Collect only a subset: root variables, top-level text colors, links, buttons, inputs,
+    // and the first N rules from external CSS to give style context without exceeding limits.
+    const inlineStyles = Array.from(document.querySelectorAll('style'))
+      .map(s => s.textContent || '')
+      .join('\n');
+
+    // Extract likely-global rules via heuristic match
+    const likelyGlobals = inlineStyles.split(/}\s*/)
+      .filter(Boolean)
+      .filter(rule => /:root|body|html|a\b|button\b|\.btn\b|input\b|select\b|textarea\b|h1\b|h2\b|h3\b|code\b|pre\b/.test(rule))
+      .slice(0, 200)
+      .join('}\n');
+
+    // Sample style attribute rules but keep very small
+    const styleAttributes = Array.from(document.querySelectorAll('[style]'))
+      .slice(0, 150)
+      .map(el => {
+        const selector = el.id ? `#${el.id}` : el.className ? `.${String(el.className).split(' ').join('.')}` : el.tagName.toLowerCase();
+        return `${selector} { ${el.getAttribute('style') || ''} }`;
+      })
+      .join('\n');
+
+    // Fetch at most the first external stylesheet and take first ~300 lines
+    const firstHref = (document.querySelector('link[rel="stylesheet"]') || {}).href;
+    let externalSample = '';
+    if (firstHref) {
+      try {
+        const resp = await chrome.runtime.sendMessage({ action: 'fetch-css-resources', urls: [firstHref] });
+        if (resp && resp.success) {
+          externalSample = String(resp.css || '').split('\n').slice(0, 300).join('\n');
+        }
+      } catch (_) {
+        // ignore
+      }
+    }
+
+    const header = '/* Minimal CSS context for Morph Apply. Prefer additive overrides, avoid breaking layout. */\n';
+    return [header, likelyGlobals, styleAttributes, externalSample].filter(Boolean).join('\n\n');
   }
 
   // Inject CSS into the page via a dedicated <style id="morph-apply-style">

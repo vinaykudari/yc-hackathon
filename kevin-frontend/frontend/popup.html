@@ -9,25 +9,12 @@
 <body>
   <div class="container">
     <header>
-      <h1>DOM API Updater</h1>
-      <p class="subtitle">Send & Update DOM via API</p>
+      <h1>Morph Apply Tools</h1>
+      <p class="subtitle">Apply CSS personas to the current page</p>
     </header>
     
     <main>
-      <div class="api-config">
-        <h2>API Configuration</h2>
-        <div class="input-group">
-          <label for="apiUrl">API Endpoint:</label>
-          <input type="text" id="apiUrl" placeholder="http://0.0.0.0:8000/test-api" value="http://0.0.0.0:8000/test-api">
-        </div>
-        <div class="input-group">
-          <label for="apiMethod">Method:</label>
-          <select id="apiMethod">
-            <option value="POST">POST</option>
-            <option value="PUT">PUT</option>
-          </select>
-        </div>
-      </div>
+      
 
       <div class="api-config" id="morphConfig">
         <h2>Morph Apply Settings</h2>
@@ -50,10 +37,6 @@
       </div>
       
       <div class="actions">
-        <button id="updateDomBtn" class="action-btn primary">
-          <span class="icon">🔄</span>
-          Update DOM via API
-        </button>
         <button id="previewBtn" class="action-btn secondary">
           <span class="icon">👁️</span>
           Preview Current DOM
