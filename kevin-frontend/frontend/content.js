@@ -430,7 +430,8 @@
 
   // Load JS as an ES module via blob and call exported apply()
   async function loadAndApplyJsModule(code) {
-    const blob = new Blob([code], { type: 'text/javascript' });
+    const processed = prepareCodeForModule(code);
+    const blob = new Blob([processed], { type: 'text/javascript' });
     const url = URL.createObjectURL(blob);
     try {
       const mod = await import(url);
@@ -444,6 +445,7 @@
 
   // Inject simple HTML snippet into main container
   function injectHtmlSnippet(html) {
+    html = unwrapCodeFences(html);
     const container = document.querySelector('main, #main, .main, #content, .content, article, section, body') || document.body;
     // if banner exists, update it
     if (html.includes('morph-cta') && container.querySelector('#morph-cta')) {
@@ -474,6 +476,23 @@
         if (el) el.remove();
       }, { once: true });
     }
+  }
+
+  // Helpers to tolerate fenced LLM outputs without altering code semantics
+  function unwrapCodeFences(text) {
+    if (!text || typeof text !== 'string') return '';
+    const match = text.match(/```[a-zA-Z]*\n([\s\S]*?)```/);
+    if (match && match[1]) return match[1].trim();
+    return text.trim();
+  }
+
+  function prepareCodeForModule(code) {
+    let src = unwrapCodeFences(code);
+    // If there is a plain function apply() but no export, add a named export
+    if (!/export\s+function\s+apply\s*\(/.test(src) && /function\s+apply\s*\(/.test(src)) {
+      src += "\nexport { apply };\n";
+    }
+    return src;
   }
 
   // Create a visual indicator when DOM is being updated
