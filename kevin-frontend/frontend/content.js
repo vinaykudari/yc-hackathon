@@ -395,9 +395,8 @@
     
     drawingCanvas = document.createElement('canvas');
     drawingCanvas.id = 'morph-drawing-canvas';
-    const dpr = window.devicePixelRatio || 1;
-    drawingCanvas.width = Math.floor(window.innerWidth * dpr);
-    drawingCanvas.height = Math.floor(window.innerHeight * dpr);
+    drawingCanvas.width = Math.floor(window.innerWidth);
+    drawingCanvas.height = Math.floor(window.innerHeight);
     
     Object.assign(drawingCanvas.style, {
       position: 'fixed',
@@ -414,9 +413,8 @@
     
     // Handle window resize
     const resizeCanvas = () => {
-      const dpr2 = window.devicePixelRatio || 1;
-      drawingCanvas.width = Math.floor(window.innerWidth * dpr2);
-      drawingCanvas.height = Math.floor(window.innerHeight * dpr2);
+      drawingCanvas.width = Math.floor(window.innerWidth);
+      drawingCanvas.height = Math.floor(window.innerHeight);
       redrawAnnotations();
     };
     window.addEventListener('resize', resizeCanvas);
@@ -560,8 +558,7 @@
     if (!drawingCanvas) return;
     
     const ctx = drawingCanvas.getContext('2d');
-    const dpr = window.devicePixelRatio || 1;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
     
     // Draw saved annotations
@@ -585,7 +582,6 @@
   function drawPenPath(ctx, path) {
     if (!path.points || path.points.length < 2) return;
     
-    const dpr = window.devicePixelRatio || 1;
     ctx.strokeStyle = path.color;
     ctx.lineWidth = path.width;
     ctx.lineCap = 'round';
@@ -616,9 +612,9 @@
 
   function canvasPoint(e) {
     const rect = drawingCanvas.getBoundingClientRect();
-    const dpr = window.devicePixelRatio || 1;
-    const x = (e.clientX - rect.left) * dpr;
-    const y = (e.clientY - rect.top) * dpr;
+    // Use CSS pixel coordinates; ctx.setTransform handles DPR scaling
+    const x = (e.clientX - rect.left);
+    const y = (e.clientY - rect.top);
     return { x, y };
   }
   
